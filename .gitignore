@@ -1,0 +1,32 @@
+# --- Project Specific Data ---
+# Never commit raw data files or spreadsheets
+data/
+*.xlsx
+*.csv
+*.db
+*.log
+
+# --- Environment & Secrets ---
+# Never commit passwords or API keys
+.env
+.venv/
+env/
+venv/
+ENV/
+venv
+
+# --- Python Artifacts ---
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+.docker/
