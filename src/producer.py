@@ -6,7 +6,7 @@ def start_ingestion(excel_path):
     df = pd.read_excel(excel_path)
     
     # Assuming the column header is 'Website'
-    urls = df['Website'].dropna().unique().tolist()
+    urls = df['website'].dropna().unique().tolist()
     
     print(f"Queueing {len(urls)} firms...")
     for url in urls:
@@ -15,4 +15,4 @@ def start_ingestion(excel_path):
     print("🚀 Ingestion complete. Check Flower for progress.")
 
 if __name__ == "__main__":
-    start_ingestion("data/law_firms.xlsx")
+    start_ingestion("data/prospects.xlsx")

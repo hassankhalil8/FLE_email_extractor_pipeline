@@ -13,19 +13,27 @@ class EmailLead(BaseModel):
     email: EmailStr
 
 async def crawl_logic(url):
-    browser_cfg = BrowserConfig(headless=True)
-    run_cfg = CrawlerRunConfig(max_depth=2, include_external=False)
+    # Modern Crawl4AI Config (Compatible with v0.3.x+)
+    browser_cfg = BrowserConfig(
+        headless=True,
+        browser_type="chromium"
+    )
+    run_cfg = CrawlerRunConfig(
+        cache_mode="bypass",
+        stream=False
+    )
     
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
         result = await crawler.arun(url=url, config=run_cfg)
+        
         if not result.success:
             return []
         
+        # Extract emails from the markdown result
         raw_emails = re.findall(EMAIL_REGEX, result.markdown)
         valid_emails = []
         for e in set(raw_emails):
             try:
-                # Pydantic validation: ensures it's a real email format
                 valid_emails.append(EmailLead(email=e.lower()).email)
             except ValidationError:
                 continue
