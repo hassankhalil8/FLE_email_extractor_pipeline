@@ -3,10 +3,14 @@ import re
 import asyncio
 import psycopg2
 from .celery_app import app
+from .extractor import ProductionEmailExtractor
 from pydantic import BaseModel, EmailStr, ValidationError
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from crawl4ai.deep_crawling import BestFirstCrawlingStrategy
 from crawl4ai.deep_crawling.scorers import KeywordRelevanceScorer
+
+
+extractor = ProductionEmailExtractor()
 
 DB_URL = os.getenv("DATABASE_URL", "postgresql://admin:password123@pgdb:5432/law_leads")
 EMAIL_REGEX = r'\b(?<![0-9.])(?![0-9]{3,})[a-zA-Z0-9._%+-]+(?<!\.)@[a-zA-Z0-9.-]+\.(?!png|jpg|jpeg|gif|svg|webp|pdf|scaled|circle)([a-zA-Z]{2,20})\b'
@@ -38,25 +42,22 @@ async def crawl_logic(url):
     
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
         # Note: Crawl4AI deep crawling returns result as a combined markdown of all 4 pages
-        result = await crawler.arun(url=url, config=run_cfg)
+        results = await crawler.arun(url=url, config=run_cfg)
         
-        if not result or not result.success:
+        if not results or not isinstance(results, list):
             return []
         
-        # Regex extraction (Case Insensitive)
-        raw_emails = re.findall(EMAIL_REGEX, result.markdown, re.IGNORECASE)
+        combined_markdown = ""
+        for res in results:
+            if res.success and res.markdown:
+                combined_markdown += f"\n{res.markdown}"
         
-        valid_emails = []
-        for e in set(raw_emails):
-            # Final check: Don't allow emails starting with numbers (phone number fragments)
-            if e[0].isdigit():
-                continue
-            try:
-                # Use Pydantic to ensure it's a real email format
-                valid_emails.append(EmailLead(email=e.lower().strip()).email)
-            except ValidationError:
-                continue
-        return valid_emails
+        if not combined_markdown:
+            return []
+        
+        final_leads = extractor.extract_all_emails(combined_markdown)
+
+        return [lead['normalized'] for lead in final_leads if lead['confidence'] in ['high', 'medium']]
 
 @app.task(bind=True, max_retries=3)
 def process_firm(self, url):
