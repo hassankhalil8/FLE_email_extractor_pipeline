@@ -26,8 +26,8 @@ async def crawl_logic(url):
     )
 
     smart_strategy = BestFirstCrawlingStrategy(
-        max_depth=1,   
-        max_pages=4,     
+        max_depth=2,   
+        max_pages=10,     
         url_scorer=legal_scorer,
         include_external=False
     )
@@ -37,7 +37,9 @@ async def crawl_logic(url):
     # 3. Apply the Strategy to the Run Config
     run_cfg = CrawlerRunConfig(
         cache_mode="bypass",
-        deep_crawl_strategy=smart_strategy  # <--- The "Brain" of the crawler
+        deep_crawl_strategy=smart_strategy,
+        page_timeout=120000,
+        wait_until="networkidle"    # <--- The "Brain" of the crawler
     )
     
     async with AsyncWebCrawler(config=browser_cfg) as crawler:
@@ -60,28 +62,53 @@ async def crawl_logic(url):
         return [lead['normalized'] for lead in final_leads if lead['confidence'] in ['high', 'medium']]
 
 @app.task(bind=True, max_retries=3)
-def process_firm(self, url):
+def process_firm(self, lead_row):
+    """
+    lead_row: Dictionary containing all Excel columns
+    """
+    url = lead_row.get('website')
+    if not url:
+        return "Skipped: No URL"
+
     try:
-        emails = asyncio.run(crawl_logic(url))
-        
-        # Logic for database remains the same (it was already good)
+        emails_data = asyncio.run(crawl_logic(url)) 
+  
+        unique_emails = {e for e in emails_data}
+        emails_string = ", ".join(unique_emails)
+
+        # 3. Save to DB exactly like the Excel Sheet
         conn = psycopg2.connect(DB_URL)
         with conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO law_firms (website_url) VALUES (%s) 
-                    ON CONFLICT (website_url) DO UPDATE SET website_url=EXCLUDED.website_url 
-                    RETURNING id
-                """, (url,))
-                firm_id = cur.fetchone()[0]
-                
-                for email in emails:
-                    cur.execute("""
-                        INSERT INTO extracted_emails (firm_id, email, source_page) 
-                        VALUES (%s, %s, %s) ON CONFLICT DO NOTHING
-                    """, (firm_id, email, url))
+                    INSERT INTO law_leads_final (
+                        apollo_id, name, website, city, state, country, 
+                        full_address, phone_number, gbp_link, gbp_review_count, 
+                        gbp_category, county, estimated_num_employees, 
+                        processing_status, emails
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (apollo_id) DO UPDATE SET 
+                        emails = EXCLUDED.emails,
+                        processing_status = 'completed';
+                """, (
+                    lead_row.get('apollo_id'),
+                    lead_row.get('name'),
+                    lead_row.get('website'),
+                    lead_row.get('city'),
+                    lead_row.get('state'),
+                    lead_row.get('country'),
+                    lead_row.get('full_address'),
+                    lead_row.get('phone_number'),
+                    lead_row.get('gbp_link'),
+                    lead_row.get('gbp_review_count'),
+                    lead_row.get('gbp_category'),
+                    lead_row.get('county'),
+                    lead_row.get('estimated_num_employees'),
+                    'completed',
+                    emails_string # Comma separated list
+                ))
         conn.close()
-        return f"Processed {url}: {len(emails)} leads found."
+        return f"Processed {url}: {len(unique_emails)} emails found."
+
     except Exception as e:
-        # If it's a database lock or network blip, retry
         raise self.retry(exc=e, countdown=60)

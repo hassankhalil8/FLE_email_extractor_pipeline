@@ -1,16 +1,20 @@
 CREATE EXTENSION IF NOT EXISTS citext;
 
-CREATE TABLE IF NOT EXISTS law_firms (
-    id SERIAL PRIMARY KEY,
-    website_url TEXT UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS extracted_emails (
-    id SERIAL PRIMARY KEY,
-    firm_id INTEGER REFERENCES law_firms(id) ON DELETE CASCADE,
-    email citext NOT NULL,
-    source_page TEXT,
-    found_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(firm_id, email)
+CREATE TABLE IF NOT EXISTS law_leads_final (
+    apollo_id TEXT PRIMARY KEY,
+    name TEXT,
+    website TEXT,
+    city TEXT,
+    state TEXT,
+    country TEXT,
+    full_address TEXT,
+    phone_number TEXT,
+    gbp_link TEXT,
+    gbp_review_count TEXT,
+    gbp_category TEXT,
+    county TEXT,
+    estimated_num_employees TEXT,
+    processing_status TEXT,
+    emails TEXT,
+    found_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
