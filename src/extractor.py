@@ -66,10 +66,6 @@ class ProductionEmailExtractor:
         ]
     
     def extract_all_emails(self, markdown: str) -> List[Dict]:
-        """
-        Main method: Extract ALL valid emails from markdown
-        Returns list of dicts with email + metadata
-        """
         print(f"📧 Starting extraction from {len(markdown)} characters of markdown...")
         
         # Step 1: Extract all possible candidates

@@ -15,4 +15,4 @@ def start_ingestion(excel_path):
     print("🚀 Ingestion complete. Check Flower for progress.")
 
 if __name__ == "__main__":
-    start_ingestion("data/prospects.xlsx")
+    start_ingestion("data/exclusive_family_law_leads.xlsx")
